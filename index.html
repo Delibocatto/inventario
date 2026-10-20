@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prueba de conexión - Inventario</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 420px; margin: 40px auto; padding: 0 16px; }
+    h2 { text-align: center; }
+    input, button { display: block; width: 100%; padding: 14px; margin: 8px 0; font-size: 16px; box-sizing: border-box; border-radius: 6px; }
+    input { border: 1px solid #aaa; }
+    button { background: #2b6cb0; color: #fff; border: none; cursor: pointer; }
+    button:disabled { background: #999; }
+    #panel[hidden] { display: none; }
+    #estado { margin-top: 16px; padding: 12px; border-radius: 6px; background: #f0f0f0; white-space: pre-wrap; word-break: break-word; }
+  </style>
+</head>
+<body>
+  <h2>Prueba de conexión</h2>
+
+  <div id="login">
+    <input id="correo" type="email" placeholder="Correo" autocomplete="username">
+    <input id="clave" type="password" placeholder="Contraseña" autocomplete="current-password">
+    <button id="btnEntrar">Entrar</button>
+  </div>
+
+  <div id="panel" hidden>
+    <button id="btnPrueba">Escribir y leer dato de prueba</button>
+    <button id="btnSalir">Cerrar sesión</button>
+  </div>
+
+  <div id="estado">Esperando...</div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import {
+      getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+    import {
+      getFirestore, doc, setDoc, getDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyCtQBhlmyn_v06WMTuMTOR14HSeNeUtQ1M",
+      authDomain: "inventario-delibocatto.firebaseapp.com",
+      projectId: "inventario-delibocatto",
+      storageBucket: "inventario-delibocatto.firebasestorage.app",
+      messagingSenderId: "854406111364",
+      appId: "1:854406111364:web:9dd270754d8a1d6bc062d1"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const $ = (id) => document.getElementById(id);
+
+    function mostrar(texto) {
+      $("estado").textContent = texto;
+    }
+
+    // Mostrar el formulario o el panel según si hay sesión iniciada
+    onAuthStateChanged(auth, (usuario) => {
+      if (usuario) {
+        $("login").hidden = true;
+        $("panel").hidden = false;
+        mostrar("Sesión iniciada como:\n" + usuario.email + "\nUID: " + usuario.uid);
+      } else {
+        $("login").hidden = false;
+        $("panel").hidden = true;
+        mostrar("No hay sesión iniciada.");
+      }
+    });
+
+    $("btnEntrar").addEventListener("click", async () => {
+      const correo = $("correo").value.trim();
+      const clave = $("clave").value;
+      if (!correo || !clave) {
+        mostrar("Escribe correo y contraseña.");
+        return;
+      }
+      $("btnEntrar").disabled = true;
+      mostrar("Iniciando sesión...");
+      try {
+        await signInWithEmailAndPassword(auth, correo, clave);
+        $("clave").value = "";
+      } catch (error) {
+        mostrar("Error al iniciar sesión:\n" + error.code);
+      } finally {
+        $("btnEntrar").disabled = false;
+      }
+    });
+
+    $("btnPrueba").addEventListener("click", async () => {
+      $("btnPrueba").disabled = true;
+      try {
+        const referencia = doc(db, "pruebas", "conexion");
+        const momento = new Date().toISOString();
+
+        mostrar("Escribiendo dato de prueba...");
+        await setDoc(referencia, { mensaje: "Conexión correcta", fecha: momento });
+
+        mostrar("Leyendo dato de prueba...");
+        const resultado = await getDoc(referencia);
+
+        if (resultado.exists()) {
+          const datos = resultado.data();
+          mostrar("Prueba exitosa.\n\nMensaje: " + datos.mensaje + "\nFecha guardada: " + datos.fecha);
+        } else {
+          mostrar("El dato se escribió pero no se encontró al leerlo.");
+        }
+      } catch (error) {
+        mostrar("Error en la prueba:\n" + error.code + "\n" + error.message);
+      } finally {
+        $("btnPrueba").disabled = false;
+      }
+    });
+
+    $("btnSalir").addEventListener("click", async () => {
+      await signOut(auth);
+    });
+  </script>
+</body>
+</html>
